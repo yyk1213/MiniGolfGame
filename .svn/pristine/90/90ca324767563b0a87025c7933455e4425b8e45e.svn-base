@@ -1,0 +1,170 @@
+#include "Ball.h"
+
+#define D3DFVF_MV_VERTEX (D3DFVF_XYZ | D3DFVF_DIFFUSE)
+#define PHYSICS_FRAMELENGTH 0.03f
+#define GRAVITY 0.003f
+#define GROUND_Y 3.0f
+#define AMMO_SIZE 0.25f
+#define GROUND_ABSORBANCE 0.2f
+
+
+void Ball::CleanUp(IDirect3DDevice9* pd3dDevice)
+{
+	if( NULL != g_pTexture)
+		g_pTexture->Release();
+	pTempMesh->Release();
+
+}
+
+bool Ball::Setup(IDirect3DDevice9* pd3dDevice, Terrain* terrain)
+{
+	g_pd3dDevice = pd3dDevice;
+	D3DXCreateSphere(pd3dDevice, 0.5f, 20, 20, &pTempMesh, NULL);//메쉬생성			//두번째 인자 반경 바뀔때마다 다른 세팅들 다 바꿔줘라.
+	g_terrain = terrain;
+	ballHeight = g_terrain->getHeight(0.0f, 0.0f);
+	Ball::vPosition = D3DXVECTOR3(0.0f, ballHeight+0.5f, -900.0f);
+	if (!g_pTexture)
+		SetupTexture(pd3dDevice);						//텍스처가 없을 경우 새로운 텍스처 생성
+	else
+		pd3dDevice->SetTexture(0, g_pTexture);		//그 외의 경우 디바이스에 텍스처만 지정
+
+													/*	흰색으로 만들기
+													pd3dDevice->SetSamplerState(0, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+													pd3dDevice->SetTextureStageState(0, D3DTSS_TEXCOORDINDEX, 0);
+													pd3dDevice->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
+													pd3dDevice->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+													pd3dDevice->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_SPECULAR);
+													*/
+													//setCamera(cam);		//출발 위치 세팅..
+													//카메라 세팅
+
+													//초기 방향에대한 크기 설정
+
+	
+	Ball::Ground = false;
+	//랜더
+	
+	pd3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_FORCE_DWORD);
+
+	return true;
+}
+
+bool Ball::update(IDirect3DDevice9* pd3dDevice, float timeDelta, float timeElapsed, FollowCamera * cam, Hole * holeCup)	//power를 받아와서 힘을 바꿔주고 그에대한 수식이필요
+{
+
+	float fTimeLeft = 2;	//잠시 2로 고정시키기위함
+	float fElapsedFrameTime;	//프레임이 너무많은시간이 흘렀으면 고정시간으로 변경
+	ballHeight = g_terrain->getHeight(vPosition.x, vPosition.z);
+	while (fTimeLeft > 0.0f)
+	{
+		fElapsedFrameTime = min(fTimeLeft, PHYSICS_FRAMELENGTH);
+
+		for (int i = 0; i < 9000; i++)
+		{
+			//볼 날라가는 것이 너무 빨리 작동되어서 갱신시간을 늦춤. 
+		}
+
+		fTimeLeft -= fElapsedFrameTime;
+
+		Ball::vPosition += Ball::vVelocity * fElapsedFrameTime;
+		//Ball::vVelocity.x -= Ball::vVelocity.x * 0.00001f;
+		//Ball::vVelocity.z -= Ball::vVelocity.z * 0.00001f;
+		if (!Ball::Ground)	//땅에 닿지 않았다면, 중력을 계속주는 작업
+		{
+			Ball::vVelocity.y -= GRAVITY * fElapsedFrameTime;//v1 = v0-gt;			//땅을 닿고서 gravity가 초기화되야함.
+		}
+		if (!Ball::Ground)		//(height+2 == vPosition.y이런 식이 만족되면 충돌..
+		{
+			if (Ball::vPosition.y < ballHeight+0.5)
+			{
+				//D3DXVECTOR3 collisionVector = g_terrain->computeNormalVector(vPosition.x, vPosition.z);		//충돌 처리 생각해보자..
+				//Ball::vVelocity.z = collisionVector.z;
+				//Ball::vVelocity.x = collisionVector.x;
+				Ball::vPosition.y = ballHeight+0.5 ;
+				Ball::vVelocity.y = -Ball::vVelocity.y * (0.7);	//힘을 작게
+				Ball::vVelocity.x *= 0.8f;		//마찰
+				Ball::vVelocity.z *= 0.8f;
+			}
+		}
+		else  //처음에 볼들어올때 y축이 0이라면 ball grand에 true줘서 굴러가게 작성		(아마 카메라 위치에 따라 달라질듯)Q!!@!@!@!@!@!#!@#!@#
+		{
+			Ball::vVelocity.x *= 0.9f;
+			Ball::vVelocity.z *= 0.9f;
+		}
+
+
+
+		cam->update(vPosition);
+		holeCup->checkHole(vPosition);		//움직임이 바뀔때마다 홀컵과의 거리를 처리해서 게임종료를 알림
+
+		D3DXMatrixTranslation(&matTranslation, Ball::vPosition.x, Ball::vPosition.y, Ball::vPosition.z);
+		pd3dDevice->SetTransform(D3DTS_WORLD, &matTranslation);
+	}
+	/*
+	D3DXMATRIX V;
+	D3DXVECTOR3 vvv()
+	D3DXMatrixLookAtLH(&V, &position, &target, &up);
+	*/
+	return false;
+}
+
+
+bool ::Ball::display()
+{
+
+	
+	D3DXMatrixTranslation(&matTranslation, Ball::vPosition.x, Ball::vPosition.y, Ball::vPosition.z);
+	g_pd3dDevice->SetTransform(D3DTS_WORLD, &matTranslation)
+		;pTempMesh->DrawSubset(0);
+	return true;
+}
+
+
+D3DXVECTOR3 Ball::getBallPosition()
+{
+	return Ball::vPosition;
+}
+
+
+void Ball::setBallPosition(IDirect3DDevice9* pd3dDevice)	//사용 안함
+{
+	//D3DXMATRIX V;
+	Ball::vPosition.x = 0.0f; Ball::vPosition.y = 11.0f; Ball::vPosition.z = 0.0f;
+	D3DXMatrixTranslation(&matTranslation, Ball::vPosition.x, Ball::vPosition.y, Ball::vPosition.z);
+	pd3dDevice->SetTransform(D3DTS_WORLD, &matTranslation);
+	//D3DXMatrixLookAtLH(&V, &position, &vPosition, &up);
+	//pd3dDevice->SetTransform(D3DTS_VIEW, &V);
+}
+
+
+HRESULT Ball::SetupTexture(IDirect3DDevice9* pd3dDevice)
+{
+	if (g_pTexture)
+		g_pTexture->Release();
+	if (FAILED(D3DXCreateTextureFromFile(pd3dDevice, "golfBall_Skin01.jpg", &g_pTexture)))
+		return E_FAIL;
+
+	pd3dDevice->SetTexture(0, g_pTexture);
+
+	return S_OK;
+}
+
+
+void Ball::setInitVec(D3DXVECTOR3 tempVec) 
+{
+	Ball::vVelocity = (vPosition-tempVec)*0.005;
+	if (Ball::vVelocity.y == ballHeight)		//지형에 수평인 벡터라면 
+	{
+		Ball::Ground = true;
+	}
+	vVelocity.y *= 2.0f;		//수치 수정
+
+}
+Ball::Ball()
+{
+}
+
+
+Ball::~Ball()
+{
+}

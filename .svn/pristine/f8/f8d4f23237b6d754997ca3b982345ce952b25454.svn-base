@@ -1,0 +1,281 @@
+#pragma once
+#include "BasicFunction.h"
+
+/*.cpp파일 정의*/
+IDirect3DDevice9* g_pd3dDevice = 0;
+int Width = 1024;
+int Height = 768;
+//각 클래스 객체 생성
+FollowCamera g_FollowCamera;
+ReadyCamera g_ReadyCamera;
+WaitCamera g_WaitCamera;
+RelayCamera g_RelayCamera;
+PowerProcess g_PowerProcess;
+float terrainHeight;
+D3DXVECTOR3 g_vBallPosition;
+D3DXMATRIX g_mBallMatrix;
+Ball g_pBall;
+Terrain g_terrain;
+Hole g_Hole;
+DisplayCount g_DisplayCount;
+
+gameType g_eType = BASIC;
+bool close= false; //홀컵과 가까운지
+float g_ballPower;
+int g_iSwingCount = 0;
+int g_fPower = 0;
+//나무
+std::vector<ObjMesh*> _TreeList;
+/*임시 저장 변수*/
+float g_icomX = 99999.0f;
+float g_icomZ = 99999.0f;
+
+//-----------------------------------------------------------------------------//
+
+// Setup
+
+//-----------------------------------------------------------------------------//
+
+bool Setup()
+{
+	g_FollowCamera.setDevice(g_pd3dDevice);
+	g_ReadyCamera.setDevice(g_pd3dDevice);
+	g_WaitCamera.setDevice(g_pd3dDevice);
+	g_ReadyCamera.setUp();
+	g_RelayCamera.setDevice(g_pd3dDevice);
+	g_PowerProcess.setUp(g_pd3dDevice);
+	g_DisplayCount.setUp(g_pd3dDevice);
+	g_Hole.setUp(g_pd3dDevice);
+	//우선 임의값
+	g_terrain.setUp(g_pd3dDevice,"field.raw", 160, 160, 20, 0.1f);
+	g_pBall.Setup(g_pd3dDevice,&g_terrain);
+	//나무 셋팅
+	DrawTrees();
+
+	g_pd3dDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
+	return true;
+}
+
+//-----------------------------------------------------------------------------//
+
+// Cleanup
+
+//-----------------------------------------------------------------------------//
+
+void Cleanup()
+{
+	g_PowerProcess.Cleanup();
+	g_pBall.CleanUp(g_pd3dDevice);
+	
+}
+
+
+void update(float timeDelta, float timeElapsed)
+{
+	//power 값을 받아옴으로서 power값을 0.0이 아니게 만든다.
+	if (GetAsyncKeyState('K') & 0x8000f)	//z축
+	{
+			g_eType = READY;
+			 g_ReadyCamera.update(g_vBallPosition);
+	}
+	if (GetAsyncKeyState('L') & 0x8000f)	//z축
+	{
+		g_eType = BASIC;
+	}
+	g_vBallPosition = g_pBall.getBallPosition();
+
+	switch (g_eType)		//타입을 다른데서 계속 변경해줄 필요 있음
+	{
+	case BASIC:
+		g_mBallMatrix=g_pBall.getMatTran();
+		g_WaitCamera.update(g_vBallPosition, g_mBallMatrix);		//0,0,0으로가느 ㄴ것을 이용하여 0,0,0세팅임의로
+		g_eType = POWERWAIT;
+		break;
+
+
+	case READY:		//READY 때는 고정된 카메라로 바꾼다. (볼포지션에서 z축에 -100유지하는) 
+		break;
+
+
+	case SHOT:
+		g_pBall.update(g_pd3dDevice, timeDelta, timeElapsed, &g_FollowCamera,&g_Hole);		//follow카메라로 바꾼다.
+		terrainHeight = g_pBall.getHeight();
+		if (g_vBallPosition.y == terrainHeight+0.5f && g_vBallPosition.x == g_icomX && g_vBallPosition.z == g_icomZ)
+		{
+			g_eType = BASIC;
+			g_icomX = 999999.0f;		//0이아닌 임의로 정해진숫자.
+			g_icomZ = 999999.0f;
+		}
+		g_icomX = g_vBallPosition.x;
+		g_icomZ = g_vBallPosition.z; 
+		break;
+
+
+	case POWERWAIT:		//(waitcamera로 방향조a절하고 그 방향대로 공을 날리자.)
+		g_PowerProcess.keyState(&g_fPower);
+		D3DXVECTOR3 tempVec = g_WaitCamera.getPosition();
+		g_pBall.setInitVec(tempVec,g_fPower);
+		
+		if (GetAsyncKeyState(VK_SPACE) & 0x8000f&& g_fPower!=0)	//z축
+		{
+			g_eType = SHOT;
+			g_iSwingCount++;
+		}
+		//파워를 입력받을 수 있는 STOP상태
+		break;
+	}
+}
+
+void Render(float timeDelta, float timeElapsed)
+{
+
+}
+
+//-----------------------------------------------------------------------------//
+
+// Display - 화면에 표시하는 부분
+
+//-----------------------------------------------------------------------------//
+
+
+bool Display(float timeDelta)
+{
+	if (g_pd3dDevice)
+	{
+		//지형
+
+		//창의 크기(width & height) 정보를 받아오기 위한 후면 버퍼
+		LPDIRECT3DSURFACE9 pBackBuffer = NULL;
+		D3DSURFACE_DESC d3dsd;
+
+		//후면 버퍼 정보의 메모리 포인터를 버퍼에 저장
+		g_pd3dDevice->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &pBackBuffer);
+		//후면 버퍼 정보를 불러옴
+		pBackBuffer->GetDesc(&d3dsd);
+		//후면 버퍼 해제
+		pBackBuffer->Release();
+
+		DWORD _backBufferWidth = d3dsd.Width;
+		DWORD _backBufferHeight = d3dsd.Height;
+		//메인화면 그리기
+
+		//메인 화면 뷰포트 설정
+		D3DVIEWPORT9 mainViewport;
+
+		mainViewport.X = 0;
+		mainViewport.Y = 0;
+		mainViewport.Width = _backBufferWidth;
+		mainViewport.Height = _backBufferHeight;
+		mainViewport.MinZ = 0.0f;
+		mainViewport.MaxZ = 1.0f;
+
+		//디바이스에 뷰포트 지정
+		g_pd3dDevice->SetViewport(&mainViewport);
+
+		// 후면 버퍼 초기화
+		g_pd3dDevice->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0xffffffff, 1.0f, 0);
+
+		if (g_eType == POWERWAIT)		//각 상태별 다른 카메라클래스사용
+		{
+			D3DXVECTOR3 tempBallPos = g_pBall.getBallPosition();
+			g_WaitCamera.keyState(timeDelta,tempBallPos);		//카메라 회전각 제한을 위해 ball의 좌표를 받는다.
+		}
+		if (g_eType == READY)
+		{
+			
+			g_ReadyCamera.keyState(timeDelta, &g_eType);
+		}//Device->Clear(0, 0, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0xffffffff, 1.0f, 0);
+
+
+		g_pd3dDevice->BeginScene();
+
+		g_pBall.display();
+		g_Hole.display();
+		g_DisplayCount.Display(g_iSwingCount);
+		g_PowerProcess.Display(g_fPower);
+		D3DXVECTOR3 ballPosition = g_pBall.getBallPosition();
+		g_Hole.checkHole(ballPosition);
+		//홀 위치
+		D3DXVECTOR3 hollPosition = g_Hole.getHolePosition();
+
+		//볼 위치가 특정 위치가 되면 중계카메라 실행
+		if (hollPosition.x - 50.0f >= g_vBallPosition.x
+			|| hollPosition.y - 50.0f >= g_vBallPosition.y
+			|| hollPosition.z - 50.0f >= g_vBallPosition.z)
+		{
+			close = true;
+		}
+
+		else close = false;
+			
+		g_Hole.checkHole(ballPosition);
+
+
+
+		g_terrain.setUpMatrices();
+		g_terrain.draw(false);
+
+		static float timeElapsed = 0.0f;            //흐른 시간
+		timeElapsed += timeDelta;
+
+		update(timeDelta, timeElapsed);
+		
+		for (int i = 0; i < _TreeList.size(); i++)
+		{
+			_TreeList[i]->SetupMatrices();
+			_TreeList[i]->Draw();
+		}
+
+		g_pd3dDevice->EndScene();
+		g_pd3dDevice->Present(0, 0, 0, 0);
+	}
+	return true;
+}
+
+void DrawTrees()
+{
+	ObjMesh* _tree = new ObjMesh(g_pd3dDevice);
+
+	_tree->Setup("resources/tree_mango_var01.obj");			
+	_tree->setPosition(-130.0f, 35.0f, 100.0f);
+	_tree->setScale(0.1, 0.1, 0.1);
+	_tree->LoadTexture("obj/low_poly_tree00.png");
+	_TreeList.push_back(_tree);
+
+	ObjMesh* _tree1 = new ObjMesh(g_pd3dDevice);
+	_tree1->Setup("resources/tree_mango_var02.obj");
+	_tree1->setPosition(-165.0f, 35.0f, 100.0f);
+	_tree1->setScale(0.08, 0.08, 0.08);
+	_tree1->LoadTexture("obj/low_poly_tree00.png");
+	_TreeList.push_back(_tree1);
+
+	ObjMesh* _tree2 = new ObjMesh(g_pd3dDevice);
+	_tree2->Setup("resources/tree_mango_var03.obj");
+	_tree2->setPosition(-100.0f, 35.0f, 100.0f);
+	_tree2->setScale(0.12, 0.12, 0.12);
+	_tree2->LoadTexture("obj/low_poly_tree00.png");
+	_TreeList.push_back(_tree2);
+
+	ObjMesh* _tree3 = new ObjMesh(g_pd3dDevice);
+	_tree3->Setup("resources/tree_mango_var01.obj");
+	_tree3->setPosition(130.0f, 35.0f, 100.0f);
+	_tree3->setScale(0.1, 0.1, 0.1);
+	_tree3->LoadTexture("obj/low_poly_tree00.png");
+	_TreeList.push_back(_tree3);
+
+	ObjMesh* _tree4 = new ObjMesh(g_pd3dDevice);
+	_tree4->Setup("resources/tree_mango_var02.obj");
+	_tree4->setPosition(160.0f, 35.0f, 100.0f);
+	_tree4->setScale(0.08, 0.08, 0.08);
+	_tree4->LoadTexture("obj/low_poly_tree00.png");
+	_TreeList.push_back(_tree4);
+
+	ObjMesh* _tree5 = new ObjMesh(g_pd3dDevice);
+	_tree5->Setup("resources/tree_mango_var03.obj");
+	_tree5->setPosition(100.0f, 35.0f, 100.0f);
+	_tree5->setScale(0.12, 0.12, 0.12);
+	_tree5->LoadTexture("obj/low_poly_tree00.png");
+	_TreeList.push_back(_tree5);
+
+}
+

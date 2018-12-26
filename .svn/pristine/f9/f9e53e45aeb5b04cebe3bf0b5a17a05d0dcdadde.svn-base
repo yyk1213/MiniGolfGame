@@ -1,0 +1,40 @@
+#include "Camera.h"
+#include "FollowCamera.h"
+
+
+FollowCamera::FollowCamera()				//FollowCamera는 공이 shot중일 때 사용하는 클래스
+{
+	m_cameraType = AIRCRAFT;
+
+	m_vPos = D3DXVECTOR3(0.0f, 0.0f, -100.0f);
+	m_vRight = D3DXVECTOR3(1.0f, 0.0f, 0.0f);
+	m_vUp = D3DXVECTOR3(0.0f, 1.0f, 0.0f);
+	m_vLook = D3DXVECTOR3(0.0f, 0.0f, 1.0f);
+}
+
+void FollowCamera::update(D3DXVECTOR3 ballPosition)
+{
+	//공 정보 받아와서 계속해서 따라간다.
+	D3DXVECTOR3 distan = D3DXVECTOR3(ballPosition.x, ballPosition.y+70.0f, ballPosition.z - 100.0f);	//볼 정보에서 -100만큼 떨어진 곳을 가서 계속해서 추적.
+	m_vPos = distan;	//카메라 위치갱신
+	D3DXMatrixLookAtLH(&V, &m_vPos, &ballPosition, &m_vUp);
+	g_pd3dDevice->SetTransform(D3DTS_VIEW, &V);
+}
+void FollowCamera::setUp()
+{
+	//투영
+	D3DXMatrixPerspectiveFovLH(&m_matProj, D3DX_PI * 0.5, 1024 / float(768), 1.0f, 1000.0f);
+	g_pd3dDevice->SetTransform(D3DTS_PROJECTION, &m_matProj);
+}
+
+void FollowCamera::setDevice(IDirect3DDevice9* pd3dDevice)
+{
+	g_pd3dDevice = pd3dDevice;
+}
+
+
+
+
+FollowCamera::~FollowCamera()
+{
+}

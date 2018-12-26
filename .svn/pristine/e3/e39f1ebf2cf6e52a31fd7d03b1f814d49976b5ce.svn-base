@@ -1,0 +1,17 @@
+#pragma once
+#ifndef FOLLOWCAMERA_H
+#define FOLLOWCAMERA_H
+#include "Camera.h"
+class FollowCamera : public Camera
+{
+public:
+
+	virtual void update(D3DXVECTOR3 ballPosition);
+	virtual void setUp();
+	virtual void setDevice(IDirect3DDevice9* pd3dDevice);
+
+	FollowCamera();
+	~FollowCamera();
+};
+#endif
+

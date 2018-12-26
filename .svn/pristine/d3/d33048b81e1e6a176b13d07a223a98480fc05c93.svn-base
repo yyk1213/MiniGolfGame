@@ -1,0 +1,27 @@
+#pragma once
+#include "Camera.h"
+class WaitCamera :
+	public Camera
+{
+public:
+	void strafe(float units); //왼쪽 오른쪽
+	void fly(float units); //위 아래
+	virtual void setDevice(IDirect3DDevice9* pd3dDevice);
+	virtual void update(D3DXVECTOR3 ballPosition, D3DXVECTOR3 g_moveWaitCamera);
+	 void setUp(D3DXVECTOR3 ballPosition);
+	void keyState(float timeDelta, D3DXVECTOR3 tempBallPos);
+	D3DXVECTOR3 getPosition();
+	void setPosition(D3DXVECTOR3 aa) { m_vPos = aa; }
+	WaitCamera();
+	~WaitCamera();
+	
+protected:
+	D3DXVECTOR3 m_vTarget;	//ball 포지션 받아와서 그 타겟에서 움직일수있게만들자.
+	D3DXVECTOR3 m_vCross;
+
+	D3DXVECTOR3 g_ballPosition;
+	float g_fTempY;
+	D3DXMATRIX m_ballMatrix;
+
+};
+

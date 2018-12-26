@@ -1,0 +1,24 @@
+#include "IntroScene.h"
+
+void Intro::CleanUp()
+{
+}
+
+bool Intro::init(LPDIRECT3DDEVICE9 device)
+{
+	return false;
+}
+
+bool Intro::LoadTexture()
+{
+	return false;
+}
+
+void Intro::Render()
+{
+}
+
+bool Intro::SetUpMatrices()
+{
+	return false;
+}

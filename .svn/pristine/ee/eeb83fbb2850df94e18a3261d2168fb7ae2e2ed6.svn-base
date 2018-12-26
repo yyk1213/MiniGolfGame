@@ -1,0 +1,233 @@
+#include "Ball.h"
+
+#define PHYSICS_FRAMELENGTH 0.03f
+#define GRAVITY 0.003f
+#define AMMO_SIZE 0.25f
+#define zPlusBound 789.5
+#define zMinusBound -789.5
+#define xPlusbound 789.5
+#define xMinusBound -789.5
+
+void Ball::CleanUp(IDirect3DDevice9* pd3dDevice)
+{
+	pTempMesh->Release();
+	//g_pd3dDevice->Release();
+}
+
+bool Ball::Setup(IDirect3DDevice9* pd3dDevice, Terrain* terrain)
+{
+	
+
+	g_pd3dDevice = pd3dDevice;
+	g_terrain = terrain;
+	ballHeight = g_terrain->getHeight(0.0f, 0.0f);
+	Ball::vPosition = D3DXVECTOR3(100.0f, ballHeight + 0.5f, -600.0f);
+	/*g_pd3dDevice->SetRenderState(D3DRS_LIGHTING, true);
+	Mtrls[0] = WHITE_MTRL;
+
+	Mtrls[1] = BLUE_MTRL;
+
+	Mtrls[2] = GREEN_MTRL;
+
+	Mtrls[3] = YELLOW_MTRL;
+
+	D3DXVECTOR3 dir(0.0f, 1.0f, 0.0f); //조명 방향
+
+	D3DXCOLOR   c = WHITE;
+
+	D3DLIGHT9 light;
+
+	ZeroMemory(&light, sizeof(light));
+
+	D3DLIGHT9 dirLight = d3d::InitDirectionalLight(&dir, &c);
+
+	g_pd3dDevice->SetLight(0, &dirLight);
+	*/
+	D3DXCreateSphere(pd3dDevice, 0.5f, 20, 20, &pTempMesh, NULL);//메쉬생성			//두번째 인자 반경 바뀔때마다 다른 세팅들 다 바꿔줘라.
+
+	Ball::Ground = false;
+
+
+	//랜더
+	//색상이나 메쉬입히려면 sphere복사해서 해야됨.
+
+	/*
+	D3DXCreateTextureFromFile(g_pd3dDevice, "field.bmp", &g_pTexture);
+	g_pd3dDevice->SetTexture(0, g_pTexture);
+
+	g_pd3dDevice->SetSamplerState(0, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+	g_pd3dDevice->SetSamplerState(0, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+	g_pd3dDevice->SetSamplerState(0, D3DSAMP_MIPFILTER, D3DTEXF_POINT);
+	g_pd3dDevice->SetRenderState(D3DRS_LIGHTING, false);
+	*/
+
+	/*
+	pTempMesh->CloneMeshFVF(0, D3DFVF_VERTEX, g_pd3dDevice, &pCloneMesh);
+	if (SUCCEEDED(pCloneMesh->GetVertexBuffer(&pTempVertexBuffer)))
+	{
+		int nNumVerts = pCloneMesh->GetNumVertices();
+		Vertex* pVertices = NULL;
+
+ 		pTempVertexBuffer->Lock(0, 0, (void**)&pVertices, 0);
+		{
+			for (int i = 0; i < nNumVerts; i++)
+			{
+				pVertices[i].diffuse = D3DCOLOR_COLORVALUE(255.0, 1.0, 1.0, 1.0);
+			}
+			
+		}
+		pTempVertexBuffer->Unlock();
+
+		pTempVertexBuffer->Release();
+	}
+	pTempMesh->Release();
+	*/
+
+
+	return true;
+}
+
+D3DXVECTOR3 Ball::update(float timeDelta, float timeElapsed, FollowCamera * cam, Hole * holeCup,WaitCamera* WaitCamera,D3DXVECTOR3 preBallPosition, bool* g_bDrop, int g_iPower)	//power를 받아와서 힘을 바꿔주고 그에대한 수식이필요
+{
+	//공 날아가는 과정
+	float fTimeLeft = 2;	//잠시 2로 고정시키기위함
+	float fElapsedFrameTime;	//프레임이 너무많은시간이 흘렀으면 고정시간으로 변경
+	ballHeight = g_terrain->getHeight(vPosition.x, vPosition.z);
+	while (fTimeLeft > 0.0f)
+	{
+		fElapsedFrameTime = min(fTimeLeft, PHYSICS_FRAMELENGTH);
+
+		for (int i = 0; i < 50000; i++)
+		{
+			//볼 날라가는 것이 너무 빨리 작동되어서 갱신시간을 늦춤. 
+		}
+
+		fTimeLeft -= fElapsedFrameTime;
+
+		Ball::vPosition += Ball::vVelocity * fElapsedFrameTime;
+		//Ball::vVelocity.x -= Ball::vVelocity.x * 0.1f;
+		//Ball::vVelocity.z -= Ball::vVelocity.z * 0.1f;
+		if (!Ball::Ground)	//땅에 닿지 않았다면, 중력을 계속주는 작업
+		{
+			Ball::vVelocity.y -= GRAVITY * fElapsedFrameTime;//v1 = v0-gt;			//땅을 닿고서 gravity가 초기화되야함.
+			if (Ball::vVelocity.y < 0 && Ball::vPosition.y>15.0f && m_cameraDir.y>3)
+			{
+				*g_bDrop = true;
+			}
+		}
+		if (!Ball::Ground)		//(height+2 == vPosition.y이런 식이 만족되면 충돌..
+		{
+			if (Ball::vPosition.y < ballHeight+0.5)
+			{
+				//D3DXVECTOR3 collisionVector = g_terrain->computeNormalVector(vPosition.x, vPosition.z);		//충돌 처리 생각해보자..
+				//Ball::vVelocity.z = collisionVector.z;
+				//Ball::vVelocity.x = collisionVector.x;
+				Ball::vPosition.y = ballHeight+0.5 ;
+				Ball::vVelocity.y = -Ball::vVelocity.y * (0.5);	//힘을 작게
+				Ball::vVelocity.x *= 0.5f;		//마찰
+				Ball::vVelocity.z *= 0.5f;
+			}
+		}
+		else  //처음에 볼들어올때 y축이 0이라면 ball grand에 true줘서 굴러가게 작성		(아마 카메라 위치에 따라 달라질듯)Q!!@!@!@!@!@!#!@#!@#
+		{
+			Ball::vVelocity.x *= 0.9f;
+			Ball::vVelocity.z *= 0.9f;
+		}
+		
+
+		holeCup->checkHole(vPosition);		//움직임이 바뀔때마다 홀컵과의 거리를 처리해서 게임종료를 알림
+		m_newCameraPosition = vPosition - preBallPosition; //볼이 움직인만큼 카메라가 똑같이 움직인다.
+		cam->update(vPosition, WaitCamera, m_newCameraPosition,g_bDrop, m_cameraDir, g_iPower);		//wait카메라의 포지션을이용하고 움직인 거리만큼 계속해서 팔로우카메라 수정
+		D3DXMatrixTranslation(&matTranslation, Ball::vPosition.x, Ball::vPosition.y, Ball::vPosition.z);
+ 		g_pd3dDevice->SetTransform(D3DTS_WORLD, &matTranslation);
+
+
+		if (vPosition.z <zMinusBound)		//지형을 벗어나는 경우 충돌처리
+		{
+			vPosition.z = zMinusBound;
+			vVelocity.z = -vVelocity.z*0.5;
+		}
+		if (vPosition.z > zPlusBound)
+		{
+			vPosition.z = zPlusBound;
+			vVelocity.z = -vVelocity.z * 0.5;
+		}
+
+		if (vPosition.x <xMinusBound)
+		{
+			vPosition.x = xMinusBound;
+			vVelocity.x = -vVelocity.x *0.5;
+		}
+		if (vPosition.x > zPlusBound)
+		{
+			vPosition.x = zPlusBound;
+			vVelocity.x = -vVelocity.x * 0.5;
+		}
+
+		
+	}
+	/*
+	D3DXMATRIX V;
+	D3DXVECTOR3 vvv()
+	D3DXMatrixLookAtLH(&V, &position, &target, &up);
+	*/
+	return m_newCameraPosition;
+}
+
+
+bool ::Ball::display()
+{
+	D3DXMatrixTranslation(&matTranslation, Ball::vPosition.x, Ball::vPosition.y, Ball::vPosition.z);
+	
+	
+	g_pd3dDevice->SetRenderState(D3DRS_LIGHTING, false);
+	g_pd3dDevice->SetTransform(D3DTS_WORLD, &matTranslation);
+	pTempMesh->DrawSubset(0); //메쉬들 그려라.
+	
+
+	return true;
+}
+
+
+D3DXVECTOR3 Ball::getBallPosition()
+{
+	return Ball::vPosition;
+}
+
+
+void Ball::setBallPosition(IDirect3DDevice9* pd3dDevice)	//사용 안함
+{
+	//D3DXMATRIX V;
+	Ball::vPosition.x = 0.0f; Ball::vPosition.y = 11.0f; Ball::vPosition.z = 0.0f;
+	D3DXMatrixTranslation(&matTranslation, Ball::vPosition.x, Ball::vPosition.y, Ball::vPosition.z);
+	pd3dDevice->SetTransform(D3DTS_WORLD, &matTranslation);
+	//D3DXMatrixLookAtLH(&V, &position, &vPosition, &up);
+	//pd3dDevice->SetTransform(D3DTS_VIEW, &V);
+}
+
+
+
+
+
+void Ball::setInitVec(D3DXVECTOR3 tempVec,float power) 
+{
+	m_cameraDir = tempVec;
+	float mediate = power * 0.02;
+	Ball::vVelocity = (vPosition - tempVec);	// 날라가야 하는 지점 -  좌표
+	
+	if (Ball::vVelocity.y == ballHeight)		//지형에 수평인 벡터라면 
+	{
+		Ball::Ground = true;
+	}
+	D3DXVec3Normalize(&vVelocity, &vVelocity);		//단위벡터
+	vVelocity *= (power * mediate);
+	
+}
+Ball::Ball()
+{
+}
+
+
+Ball::~Ball()
+{
+}

@@ -1,0 +1,21 @@
+#pragma once
+
+#ifndef MINIMAP_H
+#define MINIMAP_H
+
+#include <d3dx9.h>
+
+class MiniMap
+{
+public:
+	MiniMap();
+	~MiniMap();
+
+	D3DVIEWPORT9 miniViewPort;
+	
+protected:
+
+	D3DXMATRIXA16 mini_matView;
+};
+
+#endif
